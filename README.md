@@ -5,6 +5,15 @@
 
 Please refer to [get_started.md](docs/get_started.md#installation) for installation and [dataset_prepare.md](docs/dataset_prepare.md#prepare-datasets) for dataset preparation.
 
+or like this
+
+my environment: torch=1.9.1,CUDA=11.4
+```
+python setup.py build
+python setup.py install
+pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
+```
+
 ## Prepare
 * depth image (nyu or kitti)
 
