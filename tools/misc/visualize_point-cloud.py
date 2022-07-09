@@ -18,18 +18,29 @@ from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 import matplotlib.pyplot as plt
 import matplotlib
 import torch.nn.functional as F
-
+from PIL import Image
 import random
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Browse a dataset')
-    parser.add_argument('config', help='train config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
+    #parser.add_argument('config', help='train config file path')
+    #parser.add_argument('checkpoint', help='checkpoint file')
+    parser.add_argument(
+        '--exp_name',
+        default=None,
+        type=str)
     parser.add_argument(
         '--output-dir',
         default=None,
         type=str,
         help='If there is no display interface, you can save it')
+    parser.add_argument(
+        '--dataset',
+        default='nyu',
+        type=str)
+    parser.add_argument(
+        '--depth_raw_path',
+        type=str)        
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -104,7 +115,10 @@ def main():
     if args.output_dir is not None:
         mkdir_or_exist(args.output_dir)
 
-    cfg = mmcv.Config.fromfile(args.config)
+    if args.dataset=='nyu':
+        cfg = mmcv.Config.fromfile('configs/_base_/datasets/nyu.py')
+    elif args.dataset=='kitti':
+        cfg = mmcv.Config.fromfile('configs/_base_/datasets/kitti.py')
     cfg = build_data_cfg(cfg, args.cfg_options)
     dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(
@@ -113,19 +127,23 @@ def main():
         workers_per_gpu=cfg.data.workers_per_gpu,
         dist=False,
         shuffle=False)
-    model = build_depther(cfg.model, test_cfg=cfg.get('test_cfg'))
-    model.eval()
+    #model = build_depther(cfg.model, test_cfg=cfg.get('test_cfg'))
+    #model.eval()
 
     # for other models
-    checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
+    #checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
 
-    model = MMDataParallel(model, device_ids=[0])
+    #model = MMDataParallel(model, device_ids=[0])
 
     progress_bar = mmcv.ProgressBar(len(dataset))
 
     if args.output_dir is not None:
         mkdir_or_exist(args.output_dir)
-
+    
+    
+    depth_path = args.depth_raw_path
+    depth_list = os.listdir(depth_path)
+    depth_list.sort()
     for idx, input in enumerate(data_loader):
 
         with torch.no_grad():
@@ -135,26 +153,41 @@ def main():
                     aug_data_dict[key].append(val)
 
             img_file = aug_data_dict['img_metas'][0]._data[0][0]['filename']
-            img = mmcv.imread(img_file)
-            name = osp.splitext(img_file)[0].split('/')[-2] + '_' + osp.splitext(img_file)[0].split('/')[-1]
-            output = model(return_loss=False, **aug_data_dict)
 
-        depth = torch.tensor(output[0], dtype=torch.float32)
-        # https://github.com/SJTU-ViSYS/StructDepth/blob/17478278c228662248772c9a0c94d553d20078c5/datasets/nyu_dataset.py#L345
+            #img = mmcv.imread(img_file)
+            img = Image.open(img_file)
+            img = np.array(img)
+            name = osp.splitext(img_file)[0].split('/')[-2] + '_' + osp.splitext(img_file)[0].split('/')[-1]
+            #output = model(return_loss=False, **aug_data_dict)
+            
+        depth = Image.open(os.path.join(depth_path,depth_list[idx]))
+        if args.dataset=='nyu':
+            depth = np.array(depth)/1000.0
+        else:
+            depth = np.array(depth)/256.0
+        depth = torch.tensor(depth, dtype=torch.float32).unsqueeze(0)
+        #depth = torch.tensor(output[0], dtype=torch.float32)
 
         # y, x
-        h, w = 480-88, 640-80
-        fx = 5.1885790117450188e+02
-        fy = 5.1946961112127485e+02
-        cx = (3.2558244941119034e+02 - 40)
-        cy = (2.5373616633400465e+02 - 44)
+        if args.dataset=='nyu':
+            h, w = 480-88, 640-80
+            fx = 5.1885790117450188e+02
+            fy = 5.1946961112127485e+02
+            cx = (3.2558244941119034e+02 - 40)
+            cy = (2.5373616633400465e+02 - 44)
+        else: 
+            h, w = 352, 1216
+            fx = 721.5377
+            fy = 721.5377
+            cx = 596.5593
+            cy = 149.854         
 
         intrinsics = [
             [fx, 0., cx, 0.], [0., fy, cy, 0.],
             [0., 0., 1., 0.], [0., 0., 0., 1.]
         ]
-        
-        depth = depth[0, 44:480-44, 40:640-40].contiguous()
+        if args.dataset=='nyu':
+            depth = depth[0, 44:480-44, 40:640-40].contiguous()
 
         meshgrid = np.meshgrid(range(w), range(h), indexing='xy')
         id_coords = np.stack(meshgrid, axis=0).astype(np.float32)
@@ -168,16 +201,21 @@ def main():
         cam_points = torch.matmul(inv_K[:3, :3], pix_coords)
         
         depth_flatten = depth.view(-1)
-
-        cam_points = torch.einsum('cn,n->cn', cam_points, depth_flatten)
-       
-
-        img_tensor = torch.tensor(img[44:480-44, 40:640-40, :], dtype=torch.uint8)
-        img_tensor = img_tensor[:, :, [2, 1, 0]]
-
-        img_tensor_flatten = img_tensor.permute(2, 0, 1).flatten(start_dim=1)
         
-        generate_pointcloud_ply(cam_points, img_tensor_flatten.numpy(), os.path.join(args.output_dir, name+'.ply'))
+        cam_points = torch.einsum('cn,n->cn', cam_points, depth_flatten)
+        
+        if args.dataset=='nyu':   
+            img_tensor = torch.tensor(img[44:480-44, 40:640-40, :], dtype=torch.uint8)
+        else:
+            img_tensor = torch.tensor(img, dtype=torch.uint8)
+        #img_tensor = img_tensor[:, :, [2, 1, 0]]
+        
+        img_tensor_flatten = img_tensor.permute(2, 0, 1).flatten(start_dim=1)
+        if args.exp_name:
+            generate_pointcloud_ply(cam_points, img_tensor_flatten.numpy(), os.path.join(args.output_dir, name+'_%s.ply'%(args.exp_name)))
+        else:
+            generate_pointcloud_ply(cam_points, img_tensor_flatten.numpy(), os.path.join(args.output_dir, name+'.ply'))
+            
         progress_bar.update()
 
 

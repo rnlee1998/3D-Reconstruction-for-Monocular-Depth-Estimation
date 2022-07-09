@@ -122,3 +122,5 @@ nfs
 
 # project
 project
+
+*.ply
