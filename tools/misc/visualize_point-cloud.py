@@ -151,12 +151,26 @@ def main():
             for data in [input]:
                 for key, val in data.items():
                     aug_data_dict[key].append(val)
-
-            img_file = aug_data_dict['img_metas'][0]._data[0][0]['filename']
-
+            if args.dataset=='nyu':
+                img_file = aug_data_dict['img_metas'][0]._data[0][0]['filename']
+                
+            else:
+                img_file = aug_data_dict['img_metas'][0][0]._data[0][0]['filename']
+                
             #img = mmcv.imread(img_file)
             img = Image.open(img_file)
             img = np.array(img)
+            
+            
+            #do kitti benchmark crop
+            if args.dataset=='kitti':
+                height = img.shape[0]
+                width = img.shape[1]
+                top_margin = int(height - 352)
+                left_margin = int((width - 1216) / 2)
+                img = img[top_margin:top_margin + 352, left_margin:left_margin + 1216, :]
+        
+            
             name = osp.splitext(img_file)[0].split('/')[-2] + '_' + osp.splitext(img_file)[0].split('/')[-1]
             #output = model(return_loss=False, **aug_data_dict)
             
