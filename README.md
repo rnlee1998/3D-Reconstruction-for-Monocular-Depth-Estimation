@@ -16,6 +16,7 @@ pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/t
 
 ## Prepare
 * depth image (nyu or kitti)
+
 attention:The depth map names should match /mnt/data/liran/workdir/Monocular-Depth-Estimation-Toolbox/splits/*.txt
 
 ## Run
