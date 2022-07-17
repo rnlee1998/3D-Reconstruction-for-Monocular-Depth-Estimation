@@ -157,6 +157,7 @@ def main():
             else:
                 img_file = aug_data_dict['img_metas'][0][0]._data[0][0]['filename']
                 
+                
             #img = mmcv.imread(img_file)
             img = Image.open(img_file)
             img = np.array(img)
@@ -170,8 +171,10 @@ def main():
                 left_margin = int((width - 1216) / 2)
                 img = img[top_margin:top_margin + 352, left_margin:left_margin + 1216, :]
         
-            
-            name = osp.splitext(img_file)[0].split('/')[-2] + '_' + osp.splitext(img_file)[0].split('/')[-1]
+            if args.dataset=='nyu':
+                name = osp.splitext(img_file)[0].split('/')[-2] + '_' + osp.splitext(img_file)[0].split('/')[-1]
+            else:
+                name = osp.splitext(img_file)[0].split('/')[-4] + '_' + osp.splitext(img_file)[0].split('/')[-1]
             #output = model(return_loss=False, **aug_data_dict)
             
         depth = Image.open(os.path.join(depth_path,depth_list[idx]))

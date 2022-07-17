@@ -16,16 +16,17 @@ pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/t
 
 ## Prepare
 * depth image (nyu or kitti)
+attention:The depth map names should match /mnt/data/liran/workdir/Monocular-Depth-Estimation-Toolbox/splits/*.txt
 
 ## Run
 *Nyu 3D reconstruction*
 ```py
-python ./tools/misc/visualize_point-cloud.py --output-dir point-cloud --dataset nyu --exp_name bts --depth_raw_path "/mnt/data2/datasets/results/nyu/raw/"
+python ./tools/misc/visualize_point-cloud.py --output-dir point_cloud --dataset nyu --exp_name bts --depth_raw_path "/mnt/data2/datasets/results/nyu/raw/"
 ```
 
 *Kitti 3D reconstruction*
 ```py
-python ./tools/misc/visualize_point-cloud.py --output-dir point-cloud --dataset kitti --exp_name bts --depth_raw_path "/mnt/data2/datasets/results/kitti/raw/"
+python ./tools/misc/visualize_point-cloud.py --output-dir point_cloud --dataset kitti --exp_name bts --depth_raw_path "/mnt/data2/datasets/results/kitti/raw/"
 ```
 
 ## Reference
